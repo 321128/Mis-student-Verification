@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Form, Alert, Table, Button } from 'react-bootstrap';
+import { Form, Alert, Table } from 'react-bootstrap';
 import Papa from 'papaparse';
 
 const CsvUploader = ({ onUpload }) => {

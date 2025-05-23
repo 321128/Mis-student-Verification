@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
-import { Container, Row, Col, Card, Nav, Spinner } from 'react-bootstrap';
+import { Container, Row, Col, Card, Nav } from 'react-bootstrap';
 import CsvUploader from './components/CsvUploader';
 import JobRoleSelector from './components/JobRoleSelector';
 import ResultsDisplay from './components/ResultsDisplay';
 import InterviewPrep from './components/InterviewPrep';
 import GdPrep from './components/GdPrep';
-import { analyzeProfile } from './services/api';
 
 function App() {
   const [csvData, setCsvData] = useState(null);
