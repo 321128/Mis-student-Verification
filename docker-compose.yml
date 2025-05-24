@@ -7,8 +7,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: mis-student-verification-app
-    ports:
-      - "3802:3802"
+    network_mode: "host"
     volumes:
       - ./:/app
       - /app/node_modules
