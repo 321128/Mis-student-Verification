@@ -1,70 +1,103 @@
-# Getting Started with Create React App
+# MIS Student Verification System
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+A comprehensive system for analyzing student profiles and matching them with job descriptions.
 
-## Available Scripts
+## Features
 
-In the project directory, you can run:
+- Upload and process student CSV data
+- Analyze job descriptions (PDF, DOCX, TXT)
+- Match students with job requirements
+- Extract and analyze skills
+- Real-time processing status updates
+- Interview preparation tools
+- Group discussion preparation tools
 
-### `npm start`
+## Architecture
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+The application consists of two main components:
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+1. **Frontend**: React.js application
+2. **Backend**: Python Flask API with NLP capabilities
+
+## Getting Started
+
+### Prerequisites
+
+- Docker and Docker Compose
+- Node.js (for local development)
+- Python 3.10+ (for local development)
+
+### Running with Docker Compose
+
+The easiest way to run the application is using Docker Compose:
+
+```bash
+# Build and start the application
+docker-compose up --build
+
+# Access the application at http://localhost:3000
+```
+
+### Local Development
+
+#### Frontend
+
+```bash
+# Install dependencies
+npm install
+
+# Start the development server
+npm start
+```
+
+#### Backend
+
+```bash
+# Navigate to the backend directory
+cd python_backend
+
+# Run the setup script
+./run.sh
+```
+
+## Usage
+
+1. Upload a CSV file containing student data
+2. Upload a job description file (PDF, DOCX, or TXT)
+3. Click "Process Files" to start the analysis
+4. View the results showing student matches with the job description
+5. Use the Interview Prep and GD Prep tabs for additional tools
+
+## CSV Format
+
+The CSV file should contain the following columns:
+- `full name of the student` or `Name`: Student's full name
+- `Roll_Number` or `ID`: Student's ID or roll number
+- Additional fields like skills, education, etc. will enhance the matching
+
+## API Endpoints
+
+- `POST /api/upload`: Upload CSV and job description files
+- `GET /api/job/{job_id}`: Get job processing status
+- `GET /api/status`: Check API status
+
+## Technologies Used
+
+- **Frontend**: React.js, Bootstrap, Axios
+- **Backend**: Python, Flask, pandas, NLTK, spaCy
+- **File Processing**: PyPDF2, python-docx
+- **Containerization**: Docker, Docker Compose
+
+## Additional Commands
 
 ### `npm test`
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+Launches the test runner in the interactive watch mode.
 
 ### `npm run build`
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
-
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
-
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
-
-### `npm run eject`
-
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
-
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
-
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
-
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+Builds the app for production to the `build` folder.
 
 ## Learn More
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).

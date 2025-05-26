@@ -1,5 +1,75 @@
-// This is a mock API service that simulates backend functionality
-// In a real application, this would make actual API calls to your backend
+import axios from 'axios';
+
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3798/api';
+
+/**
+ * Uploads student CSV and job description files for processing
+ * @param {Object} csvData - Object containing CSV file and parsed data
+ * @param {File} jobDescFile - Job description file (PDF, DOCX, or TXT)
+ * @returns {Promise} - Promise that resolves to initial processing response
+ */
+export const uploadFiles = async (csvData, jobDescFile) => {
+  try {
+    const formData = new FormData();
+    formData.append('csv', csvData.file);
+    formData.append('jobDesc', jobDescFile);
+    
+    const response = await axios.post(`${API_URL}/upload`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    });
+    
+    return response.data;
+  } catch (error) {
+    console.error('Error uploading files:', error);
+    throw new Error(error.response?.data?.error || 'Failed to upload files');
+  }
+};
+
+/**
+ * Polls the server for processing status updates
+ * @param {string} jobId - Processing job ID
+ * @returns {Promise} - Promise that resolves to current processing status
+ */
+export const getProcessingStatus = async (jobId) => {
+  try {
+    const response = await axios.get(`${API_URL}/job/${jobId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error getting processing status:', error);
+    throw new Error(error.response?.data?.error || 'Failed to get processing status');
+  }
+};
+
+/**
+ * Gets a list of recent jobs
+ * @returns {Promise} - Promise that resolves to list of jobs
+ */
+export const getJobs = async () => {
+  try {
+    const response = await axios.get(`${API_URL}/jobs`);
+    return response.data;
+  } catch (error) {
+    console.error('Error getting jobs:', error);
+    throw new Error(error.response?.data?.error || 'Failed to get jobs');
+  }
+};
+
+/**
+ * Gets reports for a student by email
+ * @param {string} email - Student email
+ * @returns {Promise} - Promise that resolves to list of reports
+ */
+export const getStudentReports = async (email) => {
+  try {
+    const response = await axios.get(`${API_URL}/student/${email}/reports`);
+    return response.data;
+  } catch (error) {
+    console.error('Error getting student reports:', error);
+    throw new Error(error.response?.data?.error || 'Failed to get student reports');
+  }
+};
 
 /**
  * Analyzes student profile and job role compatibility

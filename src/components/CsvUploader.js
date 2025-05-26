@@ -29,6 +29,7 @@ const CsvUploader = ({ onUpload }) => {
       setFile(null);
       setError('');
       setPreview(null);
+      onUpload(null);
       return;
     }
     
@@ -37,6 +38,7 @@ const CsvUploader = ({ onUpload }) => {
       setFile(null);
       setError(validationError);
       setPreview(null);
+      onUpload(null);
       // Reset file input
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
@@ -51,14 +53,34 @@ const CsvUploader = ({ onUpload }) => {
     Papa.parse(selectedFile, {
       header: true,
       skipEmptyLines: true,
-      preview: 5, // Only parse first 5 rows for preview
       complete: (results) => {
-        setPreview(results);
-        onUpload(results);
+        // Create a preview with just the first 5 rows
+        const previewResults = {
+          ...results,
+          data: results.data.slice(0, 5)
+        };
+        
+        setPreview(previewResults);
+        
+        if (results.data && results.data.length > 0) {
+          console.log(`CSV parsed successfully with ${results.data.length} rows`);
+          
+          // Log the first row to help with debugging
+          console.log('First row sample:', results.data[0]);
+          
+          onUpload({
+            file: selectedFile,
+            data: results.data
+          });
+        } else {
+          setError('No data found in CSV file');
+          onUpload(null);
+        }
       },
       error: (error) => {
         setError('Error parsing CSV: ' + error.message);
         setPreview(null);
+        onUpload(null);
       }
     });
   };
@@ -100,7 +122,7 @@ const CsvUploader = ({ onUpload }) => {
   return (
     <div>
       <Form.Group controlId="csvUpload" className="mb-3">
-        <Form.Label>Upload your academic and skills CSV file</Form.Label>
+        <Form.Label>Upload your student profiles CSV file</Form.Label>
         <Form.Control 
           type="file" 
           onChange={handleFileChange}
@@ -109,6 +131,7 @@ const CsvUploader = ({ onUpload }) => {
         />
         <Form.Text className="text-muted">
           File should be in CSV format and less than 5MB in size.
+          Must include student name, email, and roll number/ID.
         </Form.Text>
       </Form.Group>
       
