@@ -1,4 +1,4 @@
-name: 🚀 Deploy with Password SSH
+name: Password-based SSH Deploy
 
 on:
   push:
@@ -13,7 +13,7 @@ jobs:
     - name: Install sshpass
       run: sudo apt-get update && sudo apt-get install -y sshpass
 
-    - name: Deploy to Remote Server using Password
+    - name: Deploy to Server using Password
       env:
         SSH_PASSWORD: ${{ secrets.SSH_PASSWORD }}
         HOST: ${{ secrets.HOST }}
@@ -21,7 +21,10 @@ jobs:
         PORT: ${{ secrets.SSH_PORT }}
         DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
       run: |
-        sshpass -p "$SSH_PASSWORD" ssh -o StrictHostKeyChecking=no -p $PORT $USER@$HOST << EOF
+        sshpass -p "$SSH_PASSWORD" ssh \
+          -o StrictHostKeyChecking=no \
+          -o UserKnownHostsFile=/dev/null \
+          -p $PORT $USER@$HOST << 'EOF'
           cd $DEPLOY_PATH
           git pull origin main
           docker compose up -d --build
