@@ -19,7 +19,7 @@ jobs:
         HOST: ${{ secrets.HOST }}
         USER: ${{ secrets.USER }}
         PORT: ${{ secrets.SSH_PORT }}
-        DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        DEPLOY_PATH: ${{ secrets.DEPLOY_5 }}
       run: |
         sshpass -p "$SSH_PASSWORD" ssh \
           -o StrictHostKeyChecking=no \
