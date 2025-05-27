@@ -1,3 +1,20 @@
+On your local dev machine:
+
+    Create a file: ~/.ssh/github_deploy_key
+
+    Paste the entire private key content into it (what you posted earlier).
+
+    Set correct permissions:
+
+    chmod 600 ~/.ssh/github_deploy_key
+
+Then try again:
+
+    ssh -i ~/.ssh/github_deploy_key ashok@192.240.1.127
+
+
+
+
  ssh -i ~/.ssh/github_deploy_key ashok@192.240.1.127
 Warning: Identity file /home/ashok/.ssh/github_deploy_key not accessible: No such file or directory.
 ssh: connect to host 192.240.1.127 port 22: Connection refused
