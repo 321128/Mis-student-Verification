@@ -8,7 +8,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install dependencies
-RUN npm install
+RUN npm install --production && npm install mongoose@7.5.0
 
 # Copy the rest of the application code
 COPY . .
@@ -19,9 +19,5 @@ EXPOSE 3798
 # Create necessary directories
 RUN mkdir -p uploads outputs logs outputs/jobs
 
-# Create a startup script
-RUN echo '#!/bin/sh\necho "Pulling Ollama models..."\nnpm run pull-models\necho "Initializing database..."\nnpm run init-db\necho "Starting server..."\nnode server.js' > /app/start.sh && \
-    chmod +x /app/start.sh
-
 # Start the application
-CMD ["/app/start.sh"]
+CMD ["node", "server.js"]

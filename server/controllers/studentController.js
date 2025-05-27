@@ -7,7 +7,8 @@ const {
   parseDOCX, 
   parseTXT, 
   createStudentDirectory,
-  logStatus
+  logStatus,
+  getParserForFile
 } = require('../utils/fileUtils');
 const { generatePersonalizedDocument, generateEmbeddings } = require('../services/llmService');
 const { generatePDF } = require('../utils/pdfUtils');
@@ -41,16 +42,30 @@ const processStudentData = async (req, res) => {
 
     // Parse the job description file based on its type
     let jobDescription = '';
-    const fileExt = path.extname(jobDescFile.originalname).toLowerCase();
+    const parser = getParserForFile(jobDescFile.originalname);
     
-    if (fileExt === '.pdf') {
-      jobDescription = await parsePDF(jobDescFile.path);
-    } else if (fileExt === '.docx') {
-      jobDescription = await parseDOCX(jobDescFile.path);
-    } else if (fileExt === '.txt') {
-      jobDescription = await parseTXT(jobDescFile.path);
-    } else {
-      return res.status(400).json({ error: 'Unsupported job description file format' });
+    if (!parser) {
+      return res.status(400).json({ 
+        error: 'Unsupported job description file format',
+        details: `File type ${path.extname(jobDescFile.originalname)} is not supported. Please use PDF, DOCX, DOC, or TXT files.`
+      });
+    }
+    
+    try {
+      jobDescription = await parser(jobDescFile.path);
+      
+      if (!jobDescription || jobDescription.trim() === '') {
+        return res.status(400).json({ 
+          error: 'Empty job description',
+          details: 'The job description file appears to be empty or could not be parsed correctly.'
+        });
+      }
+    } catch (error) {
+      console.error(`Error parsing job description file: ${error.message}`);
+      return res.status(400).json({ 
+        error: 'Failed to parse job description file',
+        details: error.message
+      });
     }
 
     // Create a job ID

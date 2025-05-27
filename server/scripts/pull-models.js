@@ -1,7 +1,7 @@
 const axios = require('axios');
 require('dotenv').config();
 
-const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434/api/pull';
+const OLLAMA_URL = 'http://host.docker.internal:11434/api/pull';
 const MODELS = [
   process.env.OLLAMA_MODEL || 'mistral:latest',
   process.env.OLLAMA_EMBED_MODEL || 'nomic-embed-text'

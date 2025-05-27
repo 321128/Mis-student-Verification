@@ -117,6 +117,70 @@ const logStatus = (rollNumber, status, message = '') => {
   fs.appendFileSync(logFile, logEntry);
 };
 
+/**
+ * Validates file MIME types
+ * @param {string} fieldname - Field name of the file
+ * @param {string} mimetype - MIME type of the file
+ * @returns {Object} - Validation result with isValid and message properties
+ */
+const validateFileMimeType = (fieldname, mimetype) => {
+  if (fieldname === 'csv') {
+    if (mimetype === 'text/csv') {
+      return { isValid: true, message: 'Valid CSV file' };
+    } else {
+      return { 
+        isValid: false, 
+        message: 'Invalid file type for CSV. Only text/csv is allowed.' 
+      };
+    }
+  } else if (fieldname === 'jobDesc') {
+    const allowedMimeTypes = [
+      'application/pdf',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/msword',
+      'text/plain'
+    ];
+    
+    if (allowedMimeTypes.includes(mimetype)) {
+      return { isValid: true, message: 'Valid job description file' };
+    } else {
+      return { 
+        isValid: false, 
+        message: 'Invalid file type for job description. Only PDF, DOCX, DOC, or TXT files are allowed.' 
+      };
+    }
+  } else {
+    return { 
+      isValid: false, 
+      message: `Unexpected field: ${fieldname}. Expected 'csv' or 'jobDesc'.` 
+    };
+  }
+};
+
+/**
+ * Gets the appropriate parser function based on file extension
+ * @param {string} filename - Original filename
+ * @returns {Function|null} - Parser function or null if not supported
+ */
+const getParserForFile = (filename) => {
+  const ext = path.extname(filename).toLowerCase();
+  
+  switch (ext) {
+    case '.pdf':
+      return parsePDF;
+    case '.docx':
+      return parseDOCX;
+    case '.doc':
+      return parseDOCX; // Use the same parser for .doc files
+    case '.txt':
+      return parseTXT;
+    case '.csv':
+      return parseCSV;
+    default:
+      return null;
+  }
+};
+
 module.exports = {
   setupFolders,
   parseCSV,
@@ -124,5 +188,7 @@ module.exports = {
   parseDOCX,
   parseTXT,
   createStudentDirectory,
-  logStatus
+  logStatus,
+  validateFileMimeType,
+  getParserForFile
 };
