@@ -1,3 +1,8 @@
+ ssh -i ~/.ssh/github_deploy_key ashok@192.240.1.127
+Warning: Identity file /home/ashok/.ssh/github_deploy_key not accessible: No such file or directory.
+ssh: connect to host 192.240.1.127 port 22: Connection refused
+
+
 ssh -i ~/.ssh/github_deploy_key ashok@<HOST>
 
 
@@ -160,3 +165,4 @@ Builds the app for production to the `build` folder.
 ## Learn More
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+
