@@ -1,3 +1,6 @@
+ssh -i ~/.ssh/github_deploy_key ashok@<HOST>
+
+
 ssh key
 
  cat ~/.ssh/github_deploy_key
