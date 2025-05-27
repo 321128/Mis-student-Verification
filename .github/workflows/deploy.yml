@@ -1,28 +1,31 @@
-name: Auto Deploy to Docker Host
+name: 🚀 Auto Deploy to Docker Host
 
 on:
   push:
     branches:
-      - main  # change if you use a different deployment branch
+      - main  # Change this if you're using a different branch
 
 jobs:
   deploy:
+    name: Deploy via SSH to Docker Host
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout Code
+    - name: 🧾 Checkout Code
       uses: actions/checkout@v3
 
-    - name: Set up SSH key
+    - name: 🔐 Set up SSH Key
       run: |
         mkdir -p ~/.ssh
         echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
         chmod 600 ~/.ssh/id_rsa
-        ssh-keyscan -H ${{ secrets.HOST }} >> ~/.ssh/known_hosts
+        echo "StrictHostKeyChecking=no" >> ~/.ssh/config
+        echo "Port ${{ secrets.SSH_PORT }}" >> ~/.ssh/config
 
-    - name: Deploy via SSH
+    - name: 🚀 Deploy Code on Remote Docker Host
       run: |
-        ssh ${{ secrets.USER }}@${{ secrets.HOST }} << EOF
+        ssh -i ~/.ssh/id_rsa -p ${{ secrets.SSH_PORT }} ${{ secrets.USER }}@${{ secrets.HOST }} << 'EOF'
+          set -e
           cd ${{ secrets.DEPLOY_PATH }}
           git pull origin main
           docker compose up -d --build
