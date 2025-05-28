@@ -1,16 +1,17 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 import os
 import pandas as pd
-import numpy as np
 import json
-import re
-import time
-from werkzeug.utils import secure_filename
-import logging
-from datetime import datetime
-import threading
 import uuid
+import logging
+import threading
+import time
+from datetime import datetime
+from werkzeug.utils import secure_filename
+import traceback
+import sys
+import re
 import nltk
 from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
@@ -18,6 +19,15 @@ from nltk.stem import WordNetLemmatizer
 import PyPDF2
 import docx
 import spacy
+
+# Import custom modules
+import config
+from models import init_db, Document, DocumentChunk, Job, JobResult, GeneratedDocument, Session
+from vector_db.document_processor import DocumentProcessor
+from vector_db.vector_store import VectorStore
+from llm_agent.agent import LLMAgent
+from llm_agent.ollama_client import OllamaClient
+from document_generator.generator import DocumentGenerator
 
 # Download NLTK resources
 nltk.download('punkt', quiet=True)
@@ -32,21 +42,25 @@ except:
     os.system("python -m spacy download en_core_web_sm")
     nlp = spacy.load("en_core_web_sm")
 
-app = Flask(__name__)
-CORS(app)
-
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Create upload folder
-UPLOAD_FOLDER = 'uploads'
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+# Initialize Flask app
+app = Flask(__name__)
+CORS(app)
 
-# Store processing jobs
-processing_jobs = {}
+# Initialize database
+init_db()
+
+# Create upload folder
+if not os.path.exists(config.UPLOAD_FOLDER):
+    os.makedirs(config.UPLOAD_FOLDER)
+app.config['UPLOAD_FOLDER'] = config.UPLOAD_FOLDER
+
+# Create output folder
+if not os.path.exists(config.OUTPUT_FOLDER):
+    os.makedirs(config.OUTPUT_FOLDER)
 
 # Skills dictionary for matching
 SKILLS = {
@@ -78,6 +92,11 @@ SKILLS = {
         'budgeting', 'forecasting', 'risk management', 'compliance', 'legal'
     ]
 }
+
+def allowed_file(filename, file_type):
+    """Check if file has an allowed extension"""
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in config.ALLOWED_EXTENSIONS.get(file_type, [])
 
 def extract_text_from_pdf(pdf_file):
     """Extract text from PDF file"""
@@ -193,79 +212,178 @@ def analyze_job_description(job_desc_text):
     
     return skills
 
-def process_student_data(job_id, student_data, job_desc_text):
-    """Process student data and match with job description"""
-    job = processing_jobs[job_id]
-    total_students = len(student_data)
-    job['total_students'] = total_students
-    
-    # Analyze job description
-    job_skills = analyze_job_description(job_desc_text)
-    job['job_skills'] = job_skills
-    
-    results = []
-    
-    # Process each student
-    for i, student in enumerate(student_data):
+def process_files(job_id, csv_path, job_desc_path):
+    """Process uploaded files and generate personalized documents"""
+    session = Session()
+    try:
+        # Get job from database
+        job = session.query(Job).filter(Job.job_id == job_id).first()
+        if not job:
+            logger.error(f"Job {job_id} not found")
+            return
+        
+        # Update job status
+        job.status = 'processing'
+        session.commit()
+        
+        # Initialize document processor
+        doc_processor = DocumentProcessor()
+        
+        # Process CSV file
         try:
-            # Update progress
-            job['processed_students'] = i + 1
+            # Read CSV file
+            df = pd.read_csv(csv_path)
+            student_data = df.to_dict('records')
+            job.total_students = len(student_data)
+            session.commit()
             
-            # Get student name and ID
-            student_name = student.get('full name of the student', student.get('Name', student.get('name', f'Student {i+1}')))
-            student_id = student.get('Roll_Number', student.get('RollNumber', student.get('ID', student.get('StudentID', f'S{1000+i}'))))
-            
-            # Analyze student profile
-            student_skills = analyze_student_profile(student)
-            
-            # Calculate match score
-            match_score = calculate_match_score(student_skills, job_skills)
-            
-            # Determine status based on match score
-            if match_score >= 70:
-                status = 'Success'
-            elif match_score >= 40:
-                status = 'Partial Success'
+            # Read job description file
+            job_desc_text = ""
+            job_desc_filename = os.path.basename(job_desc_path)
+            if job_desc_filename.endswith('.pdf'):
+                with open(job_desc_path, 'rb') as f:
+                    job_desc_text = extract_text_from_pdf(f)
+            elif job_desc_filename.endswith('.docx'):
+                with open(job_desc_path, 'rb') as f:
+                    job_desc_text = extract_text_from_docx(f)
             else:
-                status = 'Failure'
+                with open(job_desc_path, 'r') as f:
+                    job_desc_text = f.read()
             
-            # Simulate email sending (in a real app, this would actually send emails)
-            email_sent = match_score >= 50
+            # Analyze job description
+            job_skills = analyze_job_description(job_desc_text)
             
-            # Add to results
-            results.append({
-                'name': student_name,
-                'rollNumber': student_id,
-                'status': status,
-                'emailSent': email_sent,
-                'matchScore': round(match_score, 2),
-                'skills': student_skills
-            })
-            
-            # Simulate processing time
-            time.sleep(0.5)
-            
+            # Process each student
+            for i, student in enumerate(student_data):
+                # Update progress
+                job.processed_students = i + 1
+                session.commit()
+                
+                # Get student name and email
+                student_name = student.get('full name of the student', student.get('Name', student.get('name', f'Student {i+1}')))
+                student_email = student.get('email', student.get('Email', ''))
+                student_id = student.get('Roll_Number', student.get('RollNumber', student.get('ID', student.get('StudentID', f'S{1000+i}'))))
+                
+                # Analyze student profile
+                student_skills = analyze_student_profile(student)
+                
+                # Calculate match score
+                match_score = calculate_match_score(student_skills, job_skills)
+                
+                # Determine status based on match score
+                if match_score >= 70:
+                    status = 'Success'
+                elif match_score >= 40:
+                    status = 'Partial Success'
+                else:
+                    status = 'Failure'
+                
+                # Initialize LLM agent
+                llm_agent = LLMAgent()
+                
+                # Extract company and role from job description filename
+                parts = os.path.splitext(job_desc_filename)[0].split('_')
+                company = parts[0] if len(parts) > 0 else "Unknown"
+                role = parts[1] if len(parts) > 1 else "Unknown"
+                
+                # Generate personalized document
+                document_content = llm_agent.generate_personalized_document(
+                    student_email=student_email,
+                    company=company,
+                    role=role
+                )
+                
+                # Initialize document generator
+                doc_generator = DocumentGenerator()
+                
+                # Generate documents in all formats
+                markdown_result = doc_generator.generate_document(
+                    content=document_content,
+                    student_email=student_email,
+                    company=company,
+                    role=role,
+                    job_id=job.id,
+                    format_type='markdown'
+                )
+                
+                pdf_result = doc_generator.generate_document(
+                    content=document_content,
+                    student_email=student_email,
+                    company=company,
+                    role=role,
+                    job_id=job.id,
+                    format_type='pdf'
+                )
+                
+                docx_result = doc_generator.generate_document(
+                    content=document_content,
+                    student_email=student_email,
+                    company=company,
+                    role=role,
+                    job_id=job.id,
+                    format_type='docx'
+                )
+                
+                # Create job result
+                result = JobResult(
+                    job_id=job.id,
+                    student_name=student_name,
+                    student_email=student_email,
+                    student_id=student_id,
+                    status=status,
+                    match_score=match_score,
+                    skills=student_skills
+                )
+                session.add(result)
+                session.commit()
+                
+                # Simulate processing time
+                time.sleep(0.5)
         except Exception as e:
-            logger.error(f"Error processing student {i}: {e}")
-            results.append({
-                'name': student.get('full name of the student', student.get('Name', student.get('name', f'Student {i+1}'))),
-                'rollNumber': student.get('Roll_Number', student.get('RollNumber', student.get('ID', student.get('StudentID', f'S{1000+i}')))),
-                'status': 'Error',
-                'emailSent': False,
-                'error': str(e)
-            })
-    
-    # Update job status
-    job['status'] = 'completed'
-    job['results'] = results
-    job['completed_at'] = datetime.now().isoformat()
-    
-    return results
+            logger.error(f"Error processing files: {e}")
+            traceback.print_exc()
+            job.status = 'failed'
+            session.commit()
+            return
+        
+        # Update job status
+        job.status = 'completed'
+        job.completed_at = datetime.utcnow()
+        session.commit()
+        
+    except Exception as e:
+        logger.error(f"Error in process_files: {e}")
+        traceback.print_exc()
+        try:
+            job.status = 'failed'
+            session.commit()
+        except:
+            pass
+    finally:
+        session.close()
 
 @app.route('/api/status', methods=['GET'])
 def status():
     """API status endpoint"""
-    return jsonify({"status": "Server is running"})
+    try:
+        # Check if Ollama is available
+        ollama_client = OllamaClient()
+        models = ollama_client.list_models()
+        
+        return jsonify({
+            "status": "Server is running",
+            "ollama_status": "connected" if models else "disconnected",
+            "available_models": models,
+            "current_model": config.OLLAMA_MODEL,
+            "alternative_model": config.OLLAMA_ALTERNATIVE_MODEL
+        })
+    except Exception as e:
+        logger.error(f"Error checking status: {e}")
+        return jsonify({
+            "status": "Server is running",
+            "ollama_status": "error",
+            "error": str(e)
+        })
 
 @app.route('/api/upload', methods=['POST'])
 def upload_files():
@@ -282,85 +400,284 @@ def upload_files():
         if csv_file.filename == '' or job_desc_file.filename == '':
             return jsonify({"error": "No selected files"}), 400
         
-        # Save CSV file
-        csv_filename = secure_filename(csv_file.filename)
-        csv_path = os.path.join(app.config['UPLOAD_FOLDER'], csv_filename)
-        csv_file.save(csv_path)
+        # Check file extensions
+        if not allowed_file(csv_file.filename, 'csv'):
+            return jsonify({"error": "Invalid CSV file format"}), 400
         
-        # Save job description file
-        job_desc_filename = secure_filename(job_desc_file.filename)
-        job_desc_path = os.path.join(app.config['UPLOAD_FOLDER'], job_desc_filename)
-        job_desc_file.save(job_desc_path)
+        if not allowed_file(job_desc_file.filename, 'document'):
+            return jsonify({"error": "Invalid job description file format"}), 400
         
-        # Read CSV file
+        # Create database session
+        session = Session()
+        
         try:
-            df = pd.read_csv(csv_path)
-            student_data = df.to_dict('records')
+            # Save CSV file
+            csv_filename = secure_filename(csv_file.filename)
+            csv_path = os.path.join(app.config['UPLOAD_FOLDER'], csv_filename)
+            csv_file.save(csv_path)
+            
+            # Save job description file
+            job_desc_filename = secure_filename(job_desc_file.filename)
+            job_desc_path = os.path.join(app.config['UPLOAD_FOLDER'], job_desc_filename)
+            job_desc_file.save(job_desc_path)
+            
+            # Create document records
+            csv_document = Document(
+                filename=csv_filename,
+                original_filename=csv_file.filename,
+                file_type='csv',
+                document_type='student_data',
+                file_path=csv_path,
+                upload_date=datetime.utcnow()
+            )
+            session.add(csv_document)
+            
+            job_desc_document = Document(
+                filename=job_desc_filename,
+                original_filename=job_desc_file.filename,
+                file_type=job_desc_filename.split('.')[-1].lower(),
+                document_type='job_description',
+                file_path=job_desc_path,
+                upload_date=datetime.utcnow()
+            )
+            session.add(job_desc_document)
+            
+            # Create job ID
+            job_id = str(uuid.uuid4())
+            
+            # Create job record
+            job = Job(
+                job_id=job_id,
+                status='created',
+                created_at=datetime.utcnow(),
+                total_students=0,
+                processed_students=0,
+                job_description_length=os.path.getsize(job_desc_path)
+            )
+            session.add(job)
+            session.commit()
+            
+            # Associate documents with job
+            job.documents.append(csv_document)
+            job.documents.append(job_desc_document)
+            session.commit()
+            
+            # Process documents in the background
+            doc_processor = DocumentProcessor()
+            doc_processor.process_document(csv_document.id)
+            doc_processor.process_document(job_desc_document.id)
+            
+            # Start processing in background
+            threading.Thread(
+                target=process_files,
+                args=(job_id, csv_path, job_desc_path)
+            ).start()
+            
+            return jsonify({
+                "job_id": job_id,
+                "status": "processing",
+                "message": "Files uploaded successfully and processing started"
+            })
+            
         except Exception as e:
-            return jsonify({"error": f"Error reading CSV file: {str(e)}"}), 400
-        
-        # Read job description file
-        job_desc_text = ""
-        if job_desc_filename.endswith('.pdf'):
-            with open(job_desc_path, 'rb') as f:
-                job_desc_text = extract_text_from_pdf(f)
-        elif job_desc_filename.endswith('.docx'):
-            with open(job_desc_path, 'rb') as f:
-                job_desc_text = extract_text_from_docx(f)
-        else:
-            with open(job_desc_path, 'r') as f:
-                job_desc_text = f.read()
-        
-        # Create job ID
-        job_id = str(uuid.uuid4())
-        
-        # Create processing job
-        processing_jobs[job_id] = {
-            'id': job_id,
-            'status': 'processing',
-            'created_at': datetime.now().isoformat(),
-            'total_students': len(student_data),
-            'processed_students': 0,
-            'job_description_length': len(job_desc_text),
-            'csv_filename': csv_filename,
-            'job_desc_filename': job_desc_filename
-        }
-        
-        # Start processing in background
-        threading.Thread(
-            target=process_student_data,
-            args=(job_id, student_data, job_desc_text)
-        ).start()
-        
-        return jsonify({
-            "job_id": job_id,
-            "status": "processing",
-            "message": "Files uploaded successfully and processing started"
-        })
-        
+            session.rollback()
+            logger.error(f"Error in upload_files: {e}")
+            traceback.print_exc()
+            return jsonify({"error": str(e)}), 500
+        finally:
+            session.close()
+            
     except Exception as e:
         logger.error(f"Error uploading files: {e}")
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/job/<job_id>', methods=['GET'])
 def get_job_status(job_id):
     """Get job status endpoint"""
-    if job_id not in processing_jobs:
-        return jsonify({"error": "Job not found"}), 404
-    
-    job = processing_jobs[job_id]
-    
-    response = {
-        "job_id": job_id,
-        "status": job['status'],
-        "total_students": job['total_students'],
-        "processed_students": job['processed_students']
-    }
-    
-    if job['status'] == 'completed':
-        response['results'] = job['results']
-    
-    return jsonify(response)
+    session = Session()
+    try:
+        # Get job from database
+        job = session.query(Job).filter(Job.job_id == job_id).first()
+        if not job:
+            return jsonify({"error": "Job not found"}), 404
+        
+        # Get job results
+        results = []
+        if job.status == 'completed':
+            for result in job.results:
+                results.append({
+                    'name': result.student_name,
+                    'email': result.student_email,
+                    'rollNumber': result.student_id,
+                    'status': result.status,
+                    'matchScore': result.match_score,
+                    'skills': result.skills
+                })
+        
+        # Get generated documents
+        documents = []
+        for doc in job.generated_documents:
+            documents.append({
+                'id': doc.id,
+                'student_email': doc.student_email,
+                'company': doc.company,
+                'role': doc.role,
+                'document_type': doc.document_type,
+                'file_path': doc.file_path,
+                'generated_at': doc.generated_at.isoformat()
+            })
+        
+        response = {
+            "job_id": job_id,
+            "status": job.status,
+            "created_at": job.created_at.isoformat(),
+            "completed_at": job.completed_at.isoformat() if job.completed_at else None,
+            "total_students": job.total_students,
+            "processed_students": job.processed_students,
+            "results": results,
+            "documents": documents
+        }
+        
+        return jsonify(response)
+    except Exception as e:
+        logger.error(f"Error getting job status: {e}")
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        session.close()
+
+@app.route('/api/document/<int:document_id>', methods=['GET'])
+def get_document(document_id):
+    """Get generated document endpoint"""
+    session = Session()
+    try:
+        # Get document from database
+        document = session.query(GeneratedDocument).filter(GeneratedDocument.id == document_id).first()
+        if not document:
+            return jsonify({"error": "Document not found"}), 404
+        
+        # Check if file exists
+        if not os.path.exists(document.file_path):
+            return jsonify({"error": "Document file not found"}), 404
+        
+        # Return file
+        return send_file(
+            document.file_path,
+            as_attachment=True,
+            download_name=os.path.basename(document.file_path)
+        )
+    except Exception as e:
+        logger.error(f"Error getting document: {e}")
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        session.close()
+
+@app.route('/api/documents/formats', methods=['GET'])
+def get_document_formats():
+    """Get available document formats endpoint"""
+    return jsonify({
+        "formats": [
+            {"id": "markdown", "name": "Markdown (.md)"},
+            {"id": "pdf", "name": "PDF Document (.pdf)"},
+            {"id": "docx", "name": "Word Document (.docx)"}
+        ]
+    })
+
+@app.route('/api/student/<email>/documents', methods=['GET'])
+def get_student_documents(email):
+    """Get documents for a student endpoint"""
+    session = Session()
+    try:
+        # Get documents from database
+        documents = session.query(GeneratedDocument).filter(GeneratedDocument.student_email == email).all()
+        
+        # Format response
+        results = []
+        for doc in documents:
+            results.append({
+                'id': doc.id,
+                'student_email': doc.student_email,
+                'company': doc.company,
+                'role': doc.role,
+                'document_type': doc.document_type,
+                'file_path': doc.file_path,
+                'generated_at': doc.generated_at.isoformat()
+            })
+        
+        return jsonify({"documents": results})
+    except Exception as e:
+        logger.error(f"Error getting student documents: {e}")
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        session.close()
+
+@app.route('/api/generate/document', methods=['POST'])
+def generate_document():
+    """Generate document endpoint"""
+    try:
+        # Get request data
+        data = request.json
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+        
+        # Check required fields
+        required_fields = ['student_email', 'company', 'role', 'job_id', 'format']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({"error": f"Missing required field: {field}"}), 400
+        
+        # Get job
+        session = Session()
+        try:
+            job = session.query(Job).filter(Job.job_id == data['job_id']).first()
+            if not job:
+                return jsonify({"error": "Job not found"}), 404
+            
+            # Initialize LLM agent
+            llm_agent = LLMAgent()
+            
+            # Generate personalized document
+            document_content = llm_agent.generate_personalized_document(
+                student_email=data['student_email'],
+                company=data['company'],
+                role=data['role']
+            )
+            
+            # Initialize document generator
+            doc_generator = DocumentGenerator()
+            
+            # Generate document in requested format
+            result = doc_generator.generate_document(
+                content=document_content,
+                student_email=data['student_email'],
+                company=data['company'],
+                role=data['role'],
+                job_id=job.id,
+                format_type=data['format']
+            )
+            
+            if 'error' in result:
+                return jsonify({"error": result['error']}), 500
+            
+            return jsonify({
+                "document_id": result['document_id'],
+                "file_path": result['file_path'],
+                "document_type": result['document_type'],
+                "message": f"Document generated successfully in {result['document_type']} format"
+            })
+        except Exception as e:
+            logger.error(f"Error generating document: {e}")
+            traceback.print_exc()
+            return jsonify({"error": str(e)}), 500
+        finally:
+            session.close()
+    except Exception as e:
+        logger.error(f"Error in generate_document: {e}")
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=config.PORT, debug=config.DEBUG)

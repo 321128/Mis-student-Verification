@@ -11,16 +11,18 @@ fi
 
 # Pull required models
 echo "Pulling required Ollama models..."
+ollama pull phi:mini
 ollama pull mistral:latest
 ollama pull nomic-embed-text
 
 # Start the application with Docker Compose
-echo "Starting MIS Student Verification System..."
+echo "Starting MIS Student Verification + Document Generation System..."
 docker-compose up --build -d
 
 echo "Application is starting..."
 echo "Frontend: http://localhost:3797"
 echo "Backend: http://localhost:3798"
-echo "MongoDB: localhost:3799"
+echo "PostgreSQL: localhost:3799"
 
 echo "You can view logs with: docker-compose logs -f"
+echo "To stop the application: docker-compose down"

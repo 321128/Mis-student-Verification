@@ -2,28 +2,32 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
-# Install system dependencies
+# Install system dependencies for pdfkit and PostgreSQL
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
+    wkhtmltopdf \
+    libpq-dev \
+    && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
 COPY requirements.txt .
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# Upgrade pip and install Python dependencies
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
 
 # Install spaCy model
 RUN python -m spacy download en_core_web_sm
 
+# Create necessary directories
+RUN mkdir -p /app/uploads /app/outputs /app/data /app/vector_db
+
 # Copy application code
 COPY . .
 
-# Create uploads directory
-RUN mkdir -p uploads
-
 # Expose port
-EXPOSE 5000
+EXPOSE 3798
 
 # Run the application
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "app:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:3798", "--timeout", "120", "app:app"]

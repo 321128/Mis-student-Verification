@@ -1,0 +1,52 @@
+# Software Engineer - Google
+
+## About the Role
+
+Google is seeking a talented Software Engineer to join our dynamic team. As a Software Engineer at Google, you will work on complex, large-scale projects that impact millions of users worldwide. You will collaborate with cross-functional teams to design, develop, test, and deploy innovative software solutions.
+
+## Responsibilities
+
+- Design, develop, test, deploy, maintain, and improve software
+- Manage individual project priorities, deadlines, and deliverables
+- Collaborate with cross-functional teams to define, design, and ship new features
+- Write clean, maintainable, and efficient code
+- Participate in code reviews and provide constructive feedback to other developers
+- Troubleshoot and debug issues in production environments
+- Stay up-to-date with emerging technologies and industry trends
+
+## Qualifications
+
+### Minimum Qualifications
+- Bachelor's degree in Computer Science, Engineering, or related technical field, or equivalent practical experience
+- 2+ years of experience in software development
+- Proficiency in one or more programming languages such as Python, Java, C++, or JavaScript
+- Experience with data structures, algorithms, and software design
+- Strong problem-solving skills and attention to detail
+
+### Preferred Qualifications
+- Master's or PhD degree in Computer Science or related field
+- 4+ years of professional software development experience
+- Experience with distributed systems, cloud computing, and microservices architecture
+- Familiarity with machine learning frameworks and techniques
+- Contributions to open-source projects
+- Experience with agile development methodologies
+- Strong communication and teamwork skills
+
+## Technologies We Use
+- Programming Languages: Python, Java, C++, JavaScript, Go
+- Frameworks: TensorFlow, Angular, React
+- Cloud Technologies: Google Cloud Platform, Kubernetes, Docker
+- Databases: BigQuery, Spanner, Cloud SQL
+- Tools: Git, CI/CD pipelines, monitoring and logging systems
+
+## Benefits
+- Competitive salary and equity package
+- Health, dental, and vision insurance
+- 401(k) plan with matching
+- Generous vacation and parental leave
+- Free meals and snacks
+- On-site fitness centers and wellness programs
+- Learning and development opportunities
+- Employee resource groups and community engagement
+
+Google is an equal opportunity employer and values diversity at our company. We do not discriminate on the basis of race, religion, color, national origin, gender, sexual orientation, age, marital status, veteran status, or disability status.
